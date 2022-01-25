@@ -1,35 +1,35 @@
 package main
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"flag"
-	"io/ioutil"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
+		"crypto/tls"
+		"crypto/x509"
+		"flag"
+		"io/ioutil"
+		"os"
+		"os/signal"
+		"syscall"
+		"time"
 
-	log "github.com/golang/glog"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+		log "github.com/golang/glog"
+		"google.golang.org/grpc"
+		"google.golang.org/grpc/credentials"
 
-	gnmi "github.com/Azure/sonic-telemetry/gnmi_server"
-	testcert "github.com/Azure/sonic-telemetry/testdata/tls"
+		gnmi "github.com/Azure/sonic-telemetry/gnmi_server"
+		testcert "github.com/Azure/sonic-telemetry/testdata/tls"
 )
 
 var (
-    userAuth = gnmi.AuthTypes{"password": false, "cert": false, "jwt": false}
-	port = flag.Int("port", -1, "port to listen on")
-	// Certificate files.
-	caCert            = flag.String("ca_crt", "", "CA certificate for client certificate validation. Optional.")
-	serverCert        = flag.String("server_crt", "", "TLS server certificate")
-	serverKey         = flag.String("server_key", "", "TLS server private key")
-	insecure          = flag.Bool("insecure", false, "Skip providing TLS cert and key, for testing only!")
-	noTLS             = flag.Bool("noTLS", false, "disable TLS, for testing only!")
-	allowNoClientCert = flag.Bool("allow_no_client_auth", false, "When set, telemetry server will request but not require a client certificate.")
-	jwtRefInt         = flag.Uint64("jwt_refresh_int", 900, "Seconds before JWT expiry the token can be refreshed.")
-	jwtValInt         = flag.Uint64("jwt_valid_int", 3600, "Seconds that JWT token is valid for.")
+		userAuth = gnmi.AuthTypes{"password": false, "cert": false, "jwt": false}
+		port = flag.Int("port", -1, "port to listen on")
+		// Certificate files.
+		caCert            = flag.String("ca_crt", "", "CA certificate for client certificate validation. Optional.")
+		serverCert        = flag.String("server_crt", "", "TLS server certificate")
+		serverKey         = flag.String("server_key", "", "TLS server private key")
+		insecure          = flag.Bool("insecure", false, "Skip providing TLS cert and key, for testing only!")
+		noTLS             = flag.Bool("noTLS", false, "disable TLS, for testing only!")
+		allowNoClientCert = flag.Bool("allow_no_client_auth", false, "When set, telemetry server will request but not require a client certificate.")
+		jwtRefInt         = flag.Uint64("jwt_refresh_int", 900, "Seconds before JWT expiry the token can be refreshed.")
+		jwtValInt         = flag.Uint64("jwt_valid_int", 3600, "Seconds that JWT token is valid for.")
 )
 
 // SignalHandler will block and wait for the signal `SIGHUP`. Once it receives this signal,
