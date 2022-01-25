@@ -35,12 +35,12 @@ var (
 // SignalHandler will block and wait for the signal `SIGHUP`. Once it receives this signal,
 // the gRPC server will be stopped and new gRPC server instance will be created with
 // updated certificate and key files.
-func SignalHandler(server *gnmi.server, signalChannel <-chan os.signal) {
-	signal_receiver := <-signalChannel
-	log.v(1).infof("gRPC server receives signal: %s and will be stopped!", signal_receiver)
-	log.v(1).infof("gRPC server is being stopped ...")
+func SignalHandler(server *gnmi.Server, signalChannel <-chan os.Signal) {
+	signalReceiver := <-signalChannel
+	log.V(1).Infof("gRPC server receives signal: %s and will be stopped!", signalReceiver)
+	log.V(1).Infof("gRPC server is being stopped ...")
 	server.Stop()
-	log.v(1).infof("gRPC server is stopped!")
+	log.V(1).Infof("gRPC server is stopped!")
 }
 
 func main() {
