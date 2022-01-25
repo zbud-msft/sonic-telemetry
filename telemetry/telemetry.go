@@ -5,6 +5,9 @@ import (
 	"crypto/x509"
 	"flag"
 	"io/ioutil"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	log "github.com/golang/glog"
@@ -16,7 +19,7 @@ import (
 )
 
 var (
-        userAuth = gnmi.AuthTypes{"password": false, "cert": false, "jwt": false}
+    userAuth = gnmi.AuthTypes{"password": false, "cert": false, "jwt": false}
 	port = flag.Int("port", -1, "port to listen on")
 	// Certificate files.
 	caCert            = flag.String("ca_crt", "", "CA certificate for client certificate validation. Optional.")
@@ -29,118 +32,137 @@ var (
 	jwtValInt         = flag.Uint64("jwt_valid_int", 3600, "Seconds that JWT token is valid for.")
 )
 
+// SignalHandler will block and wait for the signal `SIGHUP`. Once it receives this signal,
+// the gRPC server will be stopped and new gRPC server instance will be created with
+// updated certificate and key files.
+func SignalHandler(server *gnmi.server, signalChannel <-chan os.signal) {
+	signal_receiver := <-signalChannel
+	log.v(1).infof("gRPC server receives signal: %s and will be stopped!", signal_receiver)
+	log.v(1).infof("gRPC server is being stopped ...")
+	server.Stop()
+	log.v(1).infof("gRPC server is stopped!")
+}
+
 func main() {
 	flag.Var(userAuth, "client_auth", "Client auth mode(s) - none,cert,password")
 	flag.Parse()
 
-	var defUserAuth gnmi.AuthTypes
-	if gnmi.READ_WRITE_MODE {
-		//In read/write mode we want to enable auth by default.
-		defUserAuth = gnmi.AuthTypes{"password": true, "cert": false, "jwt": true}
-	}else {
-		defUserAuth = gnmi.AuthTypes{"jwt": false, "password": false, "cert": false}
-	}
+	signalChannel := make(chan os.Signal, 1)
+	signal.Notify(signalChannel, syscall.SIGHUP)
 
-        if isFlagPassed("client_auth") {
-                log.V(1).Infof("client_auth provided")
-        }else {
-                log.V(1).Infof("client_auth not provided, using defaults.")
-                userAuth = defUserAuth
-        }
-
-	switch {
-	case *port <= 0:
-		log.Errorf("port must be > 0.")
-		return
-	}
-	gnmi.JwtRefreshInt = time.Duration(*jwtRefInt*uint64(time.Second))
-	gnmi.JwtValidInt = time.Duration(*jwtValInt*uint64(time.Second))
-
-	cfg := &gnmi.Config{}
-	cfg.Port = int64(*port)
-	var opts []grpc.ServerOption
-
-	if !*noTLS {
-		var certificate tls.Certificate
-		var err error
-		if *insecure {
-			certificate, err = testcert.NewCert()
-			if err != nil {
-				log.Exitf("could not load server key pair: %s", err)
-			}
-		} else {
-			 switch {
-			   case *serverCert == "":
-				  log.Errorf("serverCert must be set.")
-				  return
-			   case *serverKey == "":
-				  log.Errorf("serverKey must be set.")
-				  return
-			}
-			certificate, err = tls.LoadX509KeyPair(*serverCert, *serverKey)
-			if err != nil {
-				log.Exitf("could not load server key pair: %s", err)
-			}
+	for {
+		var defUserAuth gnmi.AuthTypes
+		if gnmi.READ_WRITE_MODE {
+			//In read/write mode we want to enable auth by default.
+			defUserAuth = gnmi.AuthTypes{"password": true, "cert": false, "jwt": true}
+		}else {
+			defUserAuth = gnmi.AuthTypes{"jwt": false, "password": false, "cert": false}
 		}
 
-		tlsCfg := &tls.Config{
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{certificate},
-		MinVersion:               tls.VersionTLS12,
-		CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
-		PreferServerCipherSuites: true,
-		CipherSuites: []uint16{
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-		},
-	}
+		if isFlagPassed("client_auth") {
+			log.V(1).Infof("client_auth provided")
+		}else {
+			log.V(1).Infof("client_auth not provided, using defaults.")
+			userAuth = defUserAuth
+		}
 
-	if *allowNoClientCert {
-		// RequestClientCert will ask client for a certificate but won't
-		// require it to proceed. If certificate is provided, it will be
-		// verified.
-		tlsCfg.ClientAuth = tls.RequestClientCert
-	}
+		switch {
+			case *port <= 0:
+				log.Errorf("port must be > 0.")
+				return
+		}
 
-	if *caCert != "" {
-		ca, err := ioutil.ReadFile(*caCert)
+		gnmi.JwtRefreshInt = time.Duration(*jwtRefInt*uint64(time.Second))
+		gnmi.JwtValidInt = time.Duration(*jwtValInt*uint64(time.Second))
+
+		cfg := &gnmi.Config{}
+		cfg.Port = int64(*port)
+		var opts []grpc.ServerOption
+
+		if !*noTLS {
+			var certificate tls.Certificate
+			var err error
+			if *insecure {
+				certificate, err = testcert.NewCert()
+				if err != nil {
+					log.Exitf("could not load server key pair: %s", err)
+				}
+			} else {
+				switch {
+					case *serverCert == "":
+						log.Errorf("serverCert must be set.")
+						return
+					case *serverKey == "":
+						log.Errorf("serverKey must be set.")
+						return
+				}
+				certificate, err = tls.LoadX509KeyPair(*serverCert, *serverKey)
+				if err != nil {
+					log.Exitf("could not load server key pair: %s", err)
+				}
+			}
+
+			tlsCfg := &tls.Config{
+				ClientAuth:   tls.RequireAndVerifyClientCert,
+				Certificates: []tls.Certificate{certificate},
+				MinVersion:               tls.VersionTLS12,
+				CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+				PreferServerCipherSuites: true,
+				CipherSuites: []uint16{
+					tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+					tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				},
+			}
+
+			if *allowNoClientCert {
+				// RequestClientCert will ask client for a certificate but won't
+				// require it to proceed. If certificate is provided, it will be
+				// verified.
+				tlsCfg.ClientAuth = tls.RequestClientCert
+			}
+
+			if *caCert != "" {
+				ca, err := ioutil.ReadFile(*caCert)
+				if err != nil {
+					log.Exitf("could not read CA certificate: %s", err)
+				}
+				certPool := x509.NewCertPool()
+				if ok := certPool.AppendCertsFromPEM(ca); !ok {
+					log.Exit("failed to append CA certificate")
+				}
+				tlsCfg.ClientCAs = certPool
+			} else {
+				if userAuth.Enabled("cert") {
+					userAuth.Unset("cert")
+					log.Warning("client_auth mode cert requires ca_crt option. Disabling cert mode authentication.")
+				}
+			}
+
+			opts = []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsCfg))}
+			cfg := &gnmi.Config{}
+			cfg.Port = int64(*port)
+			cfg.UserAuth = userAuth
+
+			gnmi.GenerateJwtSecretKey()
+		}
+
+		s, err := gnmi.NewServer(cfg, opts)
 		if err != nil {
-			log.Exitf("could not read CA certificate: %s", err)
+			log.Errorf("Failed to create gNMI server: %v", err)
+			return
 		}
-		certPool := x509.NewCertPool()
-		if ok := certPool.AppendCertsFromPEM(ca); !ok {
-			log.Exit("failed to append CA certificate")
-		}
-		tlsCfg.ClientCAs = certPool
-	} else {
-		if userAuth.Enabled("cert") {
-			userAuth.Unset("cert")
-			log.Warning("client_auth mode cert requires ca_crt option. Disabling cert mode authentication.")
-		}
+
+		go SignalHandler(s, signalChannel)
+
+		log.V(1).Infof("Auth Modes: ", userAuth)
+		log.V(1).Infof("Starting RPC server on address: %s", s.Address())
+		s.Serve() // blocks until close
+		log.Flush()
 	}
-
-	opts = []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsCfg))}
-	cfg := &gnmi.Config{}
-	cfg.Port = int64(*port)
-	cfg.UserAuth = userAuth
-
-	gnmi.GenerateJwtSecretKey()
-}
-
-	s, err := gnmi.NewServer(cfg, opts)
-	if err != nil {
-		log.Errorf("Failed to create gNMI server: %v", err)
-		return
-	}
-
-	log.V(1).Infof("Auth Modes: ", userAuth)
-	log.V(1).Infof("Starting RPC server on address: %s", s.Address())
-	s.Serve() // blocks until close
-	log.Flush()
 }
 
 func isFlagPassed(name string) bool {
