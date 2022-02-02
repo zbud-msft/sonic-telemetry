@@ -161,11 +161,11 @@ func (srv *Server) Serve() error {
 // cancels all active RPCs on the server side and the corresponding pending RPCs on the client
 // side will get notified by connection errors.
 func (srv *Server) Stop() {
-	s := srv.s
-	if s == nil {
-		fmt.Errorf("gRPC server failed to stop!")
-	}
-	srv.s.Stop()
+    s := srv.s
+    if s == nil {
+        fmt.Errorf("gRPC server failed to stop!")
+    }
+    srv.s.Stop()
 }
 
 // Address returns the port the Server is listening to.
