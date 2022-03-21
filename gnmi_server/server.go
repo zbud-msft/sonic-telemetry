@@ -318,7 +318,7 @@ func (s *Server) Get(ctx context.Context, req *gnmipb.GetRequest) (*gnmipb.GetRe
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
-	for index, spbValue := range spbValues {
+	for _, spbValue := range spbValues {
 		update := &gnmipb.Update{
 			Path: spbValue.GetPath(),
 			Val:  spbValue.GetVal(),
@@ -329,7 +329,6 @@ func (s *Server) Get(ctx context.Context, req *gnmipb.GetRequest) (*gnmipb.GetRe
 			Prefix:    prefix,
 			Update:    []*gnmipb.Update{update},
 		}
-		index++
 	}
 	return &gnmipb.GetResponse{Notification: notifications}, nil
 }

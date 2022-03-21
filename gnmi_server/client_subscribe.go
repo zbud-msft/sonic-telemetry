@@ -197,7 +197,7 @@ func (c *Client) recv(stream gnmipb.GNMI_SubscribeServer) {
 		switch err {
 		default:
 			log.V(1).Infof("Client %s received error: %v", c, err)
-			return
+			break
 		case io.EOF:
 			log.V(1).Infof("Client %s received io.EOF", c)
 			if c.subscribe.Mode == gnmipb.SubscriptionList_STREAM {
@@ -209,14 +209,14 @@ func (c *Client) recv(stream gnmipb.GNMI_SubscribeServer) {
 				<-stream.Context().Done()
 				log.V(1).Infof("Client is done '%s'", c)
 			}
-			return
+			break
 		case nil:
 		}
 
 		if c.subscribe.Mode == gnmipb.SubscriptionList_POLL {
 			log.V(3).Infof("Client %s received Poll event: %v", c, event)
 			if _, ok := event.Request.(*gnmipb.SubscribeRequest_Poll); !ok {
-				return
+				break
 			}
 			c.polled <- struct{}{}
 			continue
