@@ -108,7 +108,7 @@ func UserPwAuth(username string, passwd string) (bool, error) {
 	    },
 	    HostKeyCallback: ssh.HostKeyCallback(func(host string, remote net.Addr, pubKey ssh.PublicKey) error {
 		keyString := keyString(pubKey)
-		knownKey = ""
+		knownKey = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBLJFxj/ivBh4hNGRQnHqp8/VPKMN/YC86/CMBeixOpZSZHWJX6k0yorwcT5tv9U6yC/ghAFS9yq3+Krqr2LAi"
 		if keyString == knownKey {
 		    // key matches
 		    glog.Infof("SSH key verification successful")
