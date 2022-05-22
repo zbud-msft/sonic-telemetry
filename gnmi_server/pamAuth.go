@@ -7,6 +7,9 @@ import (
 	"github.com/msteinert/pam"
 	"golang.org/x/crypto/ssh"
 	"os/user"
+        "os"
+	"net"
+	"encoding/base64"
 )
 
 type UserCredential struct {
@@ -84,6 +87,10 @@ func PopulateAuthStruct(username string, auth *common_utils.AuthInfo, r []string
 	return nil
 }
 
+func keyString(k ssh.PublicKey) string {
+    return k.Type() + " " + base64.StdEncoding.EncodeToString(k.Marshal())
+}
+
 func UserPwAuth(username string, passwd string) (bool, error) {
 	/*
 	 * mgmt-framework container does not have access to /etc/passwd, /etc/group,
@@ -94,15 +101,29 @@ func UserPwAuth(username string, passwd string) (bool, error) {
 	// err := PAMAuthUser(username, passwd)
 
 	//Use ssh for authentication.
-	config := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(passwd),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	config := &ssh.ClientConfig {
+	    User: username,
+	    Auth: []ssh.AuthMethod {
+		ssh.Password(passwd),
+	    },
+	    HostKeyCallback: ssh.HostKeyCallback(func(host string, remote net.Addr, pubKey ssh.PublicKey) error {
+		keyString := keyString(pubKey)
+		knownKey = ""
+		if keyString == knownKey {
+		    // key matches
+		    glog.Infof("SSH key verification successful")
+		} else {
+		    glog.Infof("SSH key verification not successful")
+		    return fmt.Errorf("SSH key verification error")
+		}
+		return nil
+	    }),
 	}
+	file.WriteString("dialing to tcp\n")
 	c, err := ssh.Dial("tcp", "127.0.0.1:22", config)
 	if err != nil {
+		file.WriteString("Authentication failed\n")
+		file.WriteString(err.Error())
 		glog.Infof("Authentication failed. user=%s, error:%s", username, err.Error())
 		return false, err
 	}
