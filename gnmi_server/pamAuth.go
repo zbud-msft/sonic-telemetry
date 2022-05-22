@@ -119,13 +119,10 @@ func UserPwAuth(username string, passwd string) (bool, error) {
 		return nil
 	    }),
 	}
-	file.WriteString("dialing to tcp\n")
 	c, err := ssh.Dial("tcp", "127.0.0.1:22", config)
 	if err != nil {
-		file.WriteString("Authentication failed\n")
-		file.WriteString(err.Error())
-		glog.Infof("Authentication failed. user=%s, error:%s", username, err.Error())
-		return false, err
+	    glog.Infof("Authentication failed. user=%s, error:%s", username, err.Error())
+	    return false, err
 	}
 	defer c.Conn.Close()
 
